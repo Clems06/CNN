@@ -1,8 +1,9 @@
 import numpy as np
 import random
 import time
-import keyboard
+#import keyboard
 import jsonpickle
+import scipy
 
 start_time = time.time()
 
@@ -23,10 +24,17 @@ def leaky_ReLu(x):
 def der_leaky_ReLu(x):
     return 0.01 if x < 0 else 1
 
+def ReLu(x):
+    return 0 if x < 0 else x
 
-activations = {"sigmoid":(np.vectorize(sigmoid), np.vectorize(der_sigmoid)), "leaky_relu":(np.vectorize(leaky_ReLu), np.vectorize(der_leaky_ReLu))}
+def der_ReLu(x):
+    return 0 if x < 0 else 1
 
-class Layer:
+
+activations = {"sigmoid":(np.vectorize(sigmoid), np.vectorize(der_sigmoid)), "leaky_relu":(np.vectorize(leaky_ReLu), np.vectorize(der_leaky_ReLu)),
+               "relu":(np.vectorize(ReLu), np.vectorize(der_ReLu))}
+
+class Full_Layer:
     def __init__(self, input_size, output_size, activation="sigmoid"):
         self.input_size = input_size
         self.output_size = output_size
@@ -48,6 +56,10 @@ class Layer:
         return self.values
 
     def backpropagate(self, layer_der_cost, prev_layer_values):
+        #Si ça connecte couchesi et i+1
+        #layer_der_cost: valeurs de neurones de i
+        #prev_layer_values: valeurs de neurones de i
+
         der_z = self.der_activation(self.z)
 
         self.bias_derivative += der_z * layer_der_cost
@@ -64,9 +76,47 @@ class Layer:
         self.weight_derivative = np.zeros((self.output_size, self.input_size))
         self.bias_derivative = np.zeros(self.output_size)
 
-def Convolutional_Layer(Layer):
-    def __init__(self, in_channels, out_channels, kernel_size, stride = 1, padding=2):
-        pass
+def convolution(a, b):
+    pass
+
+class ConvolutionalLayer:
+    def __init__(self, in_channels, out_channels, kernel_size, stride = 1, padding=2, activation="relu"):
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.stride = stride
+        self.padding = padding
+
+        #Filtre -> Kernels -> Matrice
+        self.filters = np.random.rand(out_channels, in_channels, kernel_size, kernel_size)
+
+        self.activation, self.der_activation = activations[activation]
+
+    def output(self, inputs):
+        return np.array([sum([scipy.signal.convolve2d(inputs[i], filter[i]) for i in range(self.in_channels)]) for filter in self.filters])
+
+    def backpropagate(self, layer_der_cost, prev_layer_values):
+        self.filters_derivative = scipy.signal.convolve2d(prev_layer_values, layer_der_cost)
+
+        #Douteux
+        return np.array([sum([scipy.signal.convolve2d(np.rot90(kernel, 2), layer_der_cost) for kernel in filter]) for filter in self.filters])
+
+
+class MaxPooling:
+    def __init__(self, in_channels, stride_size, stride = 1, padding=2):
+        self.in_channels = in_channels
+        self.out_channels = in_channels
+        self.stride = stride
+        self.padding = padding
+
+    def output(self, inputs):
+
+
+    def backpropagate(self, layer_der_cost, prev_layer_values):
+        self.filters_derivative = scipy.signal.convolve2d(prev_layer_values, layer_der_cost)
+
+        #Douteux
+        return np.array([sum([scipy.signal.convolve2d(np.rot90(kernel, 2), layer_der_cost) for kernel in filter]) for filter in self.filters])
+
 
 class Net:
     def __init__(self, input_size):
@@ -152,7 +202,7 @@ class Net:
         print('Net succesfully saved')
 
     def add_layer(self, size, activation):
-        self.layers.append(Layer(self.topology[-1], size, activation=activation))
+        self.layers.append(Full_Layer(self.topology[-1], size, activation=activation))
         self.topology.append(size)
 
 
